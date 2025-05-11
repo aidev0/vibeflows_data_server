@@ -5,6 +5,8 @@ Configuration settings for the data server.
 import os
 from typing import Dict, Any
 from dotenv import load_dotenv
+from pydantic import BaseSettings
+from typing import Optional
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,9 +27,7 @@ API_PORT = int(os.getenv("API_PORT", "5000"))
 API_DEBUG = False
 
 # Security settings
-JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key")
-JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+DATA_SERVER_API_KEY = os.getenv("DATA_SERVER_API_KEY", "5bI8Y7NkWK0lBbDY4OUnp0t8o1E2zMim6pVOd6gzNYA")
 
 # Default agent settings
 DEFAULT_AGENT_CONFIG: Dict[str, Any] = {
@@ -97,24 +97,23 @@ AGENT_CONFIGS: Dict[str, Dict[str, Any]] = {
     "default": DEFAULT_AGENT_CONFIG
 }
 
-class Settings:
-    def __init__(self):
-        self.ADMIN_ID = ADMIN_ID
-        self.MONGODB_URI = MONGODB_URI
-        self.MONGODB_DATABASE = MONGODB_DATABASE
-        self.API_HOST = API_HOST
-        self.API_PORT = API_PORT
-        self.API_DEBUG = API_DEBUG
-        self.JWT_SECRET = JWT_SECRET
-        self.JWT_ALGORITHM = JWT_ALGORITHM
-        self.ACCESS_TOKEN_EXPIRE_MINUTES = ACCESS_TOKEN_EXPIRE_MINUTES
-        self.DEFAULT_AGENT_CONFIG = DEFAULT_AGENT_CONFIG
-        self.GEMINI_CONFIG = GEMINI_CONFIG
-        self.VALID_AGENT_TYPES = VALID_AGENT_TYPES
-        self.VALID_WORKFLOW_STATUSES = VALID_WORKFLOW_STATUSES
-        self.VALID_MESSAGE_TYPES = VALID_MESSAGE_TYPES
-        self.AGENT_CONFIGS = AGENT_CONFIGS
-        self.DATA_CUT_OFF_DAYS = int(os.getenv("DATA_CUT_OFF_DAYS", "30"))
+class Settings(BaseSettings):
+    # MongoDB settings
+    mongodb_uri: str = MONGODB_URI
+    mongodb_db: str = MONGODB_DATABASE
+    
+    # API settings
+    api_key: str = DATA_SERVER_API_KEY
+    admin_id: str = ADMIN_ID
+    
+    # Server settings
+    host: str = API_HOST
+    port: int = API_PORT
+    debug: bool = API_DEBUG
+    
+    class Config:
+        env_file = ".env"
 
-def get_settings():
+def get_settings() -> Settings:
+    """Get the application settings."""
     return Settings() 

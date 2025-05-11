@@ -20,7 +20,7 @@ from data_server.models.schemas import (
     Agent, AgentCreate, AgentUpdate,
     Team, TeamCreate, TeamUpdate
 )
-from data_server.api.security import get_api_key
+from data_server.api.security import get_api_key, verify_api_key, get_user_data
 
 class DataServerAPI:
     """API endpoints for data server."""
@@ -53,6 +53,7 @@ class DataServerAPI:
             allow_headers=["*"],
         )
         
+        self.router = APIRouter(prefix="/api/v1")
         self._setup_routes()
         
     def _setup_routes(self) -> None:
@@ -131,6 +132,87 @@ class DataServerAPI:
                     detail=f"Service unhealthy: {str(e)}"
                 )
 
+        # User routes
+        @self.router.get("/users/{user_id}", response_model=User, dependencies=[Depends(verify_api_key)])
+        async def get_user(user_id: str):
+            user = await self.mongodb.get_user(user_id)
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            return user
+
+        @self.router.get("/users", response_model=List[User], dependencies=[Depends(verify_api_key)])
+        async def get_users(user_id: str):
+            users = await self.mongodb.get_users()
+            return await get_user_data(user_id, users)
+
+        # Team routes
+        @self.router.get("/teams/{team_id}", response_model=Team, dependencies=[Depends(verify_api_key)])
+        async def get_team(team_id: str, user_id: str):
+            team = await self.mongodb.get_team(team_id)
+            if not team:
+                raise HTTPException(status_code=404, detail="Team not found")
+            return await get_user_data(user_id, team)
+
+        @self.router.get("/teams", response_model=List[Team], dependencies=[Depends(verify_api_key)])
+        async def get_teams(user_id: str):
+            teams = await self.mongodb.get_teams()
+            return await get_user_data(user_id, teams)
+
+        # Chat routes
+        @self.router.get("/chats/{chat_id}", response_model=Chat, dependencies=[Depends(verify_api_key)])
+        async def get_chat(chat_id: str, user_id: str):
+            chat = await self.mongodb.get_chat(chat_id)
+            if not chat:
+                raise HTTPException(status_code=404, detail="Chat not found")
+            return await get_user_data(user_id, chat)
+
+        @self.router.get("/chats", response_model=List[Chat], dependencies=[Depends(verify_api_key)])
+        async def get_chats(user_id: str):
+            chats = await self.mongodb.get_chats()
+            return await get_user_data(user_id, chats)
+
+        # Message routes
+        @self.router.get("/messages/{message_id}", response_model=Message, dependencies=[Depends(verify_api_key)])
+        async def get_message(message_id: str, user_id: str):
+            message = await self.mongodb.get_message(message_id)
+            if not message:
+                raise HTTPException(status_code=404, detail="Message not found")
+            return await get_user_data(user_id, message)
+
+        @self.router.get("/messages", response_model=List[Message], dependencies=[Depends(verify_api_key)])
+        async def get_messages(user_id: str):
+            messages = await self.mongodb.get_messages()
+            return await get_user_data(user_id, messages)
+
+        # Workflow routes
+        @self.router.get("/workflows/{workflow_id}", response_model=Workflow, dependencies=[Depends(verify_api_key)])
+        async def get_workflow(workflow_id: str, user_id: str):
+            workflow = await self.mongodb.get_workflow(workflow_id)
+            if not workflow:
+                raise HTTPException(status_code=404, detail="Workflow not found")
+            return await get_user_data(user_id, workflow)
+
+        @self.router.get("/workflows", response_model=List[Workflow], dependencies=[Depends(verify_api_key)])
+        async def get_workflows(user_id: str):
+            workflows = await self.mongodb.get_workflows()
+            return await get_user_data(user_id, workflows)
+
+        # Agent routes
+        @self.router.get("/agents/{agent_id}", response_model=Agent, dependencies=[Depends(verify_api_key)])
+        async def get_agent(agent_id: str, user_id: str):
+            agent = await self.mongodb.get_agent(agent_id)
+            if not agent:
+                raise HTTPException(status_code=404, detail="Agent not found")
+            return await get_user_data(user_id, agent)
+
+        @self.router.get("/agents", response_model=List[Agent], dependencies=[Depends(verify_api_key)])
+        async def get_agents(user_id: str):
+            agents = await self.mongodb.get_agents()
+            return await get_user_data(user_id, agents)
+
+        # Add the router to the app
+        self.app.include_router(self.router)
+        
         # User endpoints
         @self.app.post("/users/", response_model=User, status_code=status.HTTP_201_CREATED)
         async def create_user(
@@ -142,20 +224,6 @@ class DataServerAPI:
                 user_data = user.dict()
                 user_id = self.mongodb.insert_document("users", user_data)
                 return {"id": user_id, **user_data}
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
-
-        @self.app.get("/users/{user_id}", response_model=User)
-        async def get_user(
-            user_id: str,
-            api_key: str = Depends(get_api_key)
-        ) -> Dict[str, Any]:
-            """Get a user by ID."""
-            try:
-                users = self.mongodb.find_documents("users", {"_id": user_id})
-                if not users:
-                    raise HTTPException(status_code=404, detail="User not found")
-                return users[0]
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
 
@@ -206,20 +274,6 @@ class DataServerAPI:
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
                 
-        @self.app.get("/chats/{chat_id}", response_model=Chat)
-        async def get_chat(
-            chat_id: str,
-            api_key: str = Depends(get_api_key)
-        ) -> Dict[str, Any]:
-            """Get a chat by ID."""
-            try:
-                chats = self.mongodb.find_documents("chats", {"_id": chat_id})
-                if not chats:
-                    raise HTTPException(status_code=404, detail="Chat not found")
-                return chats[0]
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
-
         @self.app.put("/chats/{chat_id}", response_model=Chat)
         async def update_chat(
             chat_id: str,
@@ -378,20 +432,6 @@ class DataServerAPI:
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
                 
-        @self.app.get("/messages/{message_id}", response_model=Message)
-        async def get_message(
-            message_id: str,
-            api_key: str = Depends(get_api_key)
-        ) -> Dict[str, Any]:
-            """Get a message by ID."""
-            try:
-                messages = self.mongodb.find_documents("messages", {"_id": message_id})
-                if not messages:
-                    raise HTTPException(status_code=404, detail="Message not found")
-                return messages[0]
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
-
         @self.app.put("/messages/{message_id}", response_model=Message)
         async def update_message(
             message_id: str,
@@ -469,20 +509,6 @@ class DataServerAPI:
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
                 
-        @self.app.get("/workflows/{workflow_id}", response_model=Workflow)
-        async def get_workflow(
-            workflow_id: str,
-            api_key: str = Depends(get_api_key)
-        ) -> Dict[str, Any]:
-            """Get a workflow by ID."""
-            try:
-                workflows = self.mongodb.find_documents("workflows", {"_id": workflow_id})
-                if not workflows:
-                    raise HTTPException(status_code=404, detail="Workflow not found")
-                return workflows[0]
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
-
         @self.app.put("/workflows/{workflow_id}", response_model=Workflow)
         async def update_workflow(
             workflow_id: str,
@@ -554,20 +580,6 @@ class DataServerAPI:
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
                 
-        @self.app.get("/agents/{agent_id}", response_model=Agent)
-        async def get_agent(
-            agent_id: str,
-            api_key: str = Depends(get_api_key)
-        ) -> Dict[str, Any]:
-            """Get an agent by ID."""
-            try:
-                agents = self.mongodb.find_documents("agents", {"_id": agent_id})
-                if not agents:
-                    raise HTTPException(status_code=404, detail="Agent not found")
-                return agents[0]
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
-
         @self.app.put("/agents/{agent_id}", response_model=Agent)
         async def update_agent(
             agent_id: str,
