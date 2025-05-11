@@ -20,7 +20,7 @@ from data_server.models.schemas import (
     Agent, AgentCreate, AgentUpdate,
     Team, TeamCreate, TeamUpdate
 )
-from data_server.api.security import get_api_key, verify_api_key, get_user_data
+from data_server.api.security import verify_api_key, get_user_data
 
 class DataServerAPI:
     """API endpoints for data server."""
@@ -217,7 +217,7 @@ class DataServerAPI:
         @self.app.post("/users/", response_model=User, status_code=status.HTTP_201_CREATED)
         async def create_user(
             user: UserCreate,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Create a new user."""
             try:
@@ -231,7 +231,7 @@ class DataServerAPI:
         async def update_user(
             user_id: str,
             user: UserUpdate,
-            api_key: str = Depends(get_api_key)
+            user_id_dep: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Update a user."""
             try:
@@ -250,7 +250,7 @@ class DataServerAPI:
         @self.app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
         async def delete_user(
             user_id: str,
-            api_key: str = Depends(get_api_key)
+            user_id_dep: str = Depends(verify_api_key)
         ) -> None:
             """Delete a user."""
             try:
@@ -264,7 +264,7 @@ class DataServerAPI:
         @self.app.post("/chats/", response_model=Chat, status_code=status.HTTP_201_CREATED)
         async def create_chat(
             chat: ChatCreate,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Create a new chat."""
             try:
@@ -278,7 +278,7 @@ class DataServerAPI:
         async def update_chat(
             chat_id: str,
             chat: ChatUpdate,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Update a chat."""
             try:
@@ -297,7 +297,7 @@ class DataServerAPI:
         @self.app.delete("/chats/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
         async def delete_chat(
             chat_id: str,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> None:
             """Delete a chat."""
             try:
@@ -309,23 +309,15 @@ class DataServerAPI:
                 
         @self.app.get("/chats/", response_model=List[Chat])
         async def list_chats(
-            user_id: Optional[str] = None,
-            session_id: Optional[str] = None,
-            limit: int = Query(100, ge=1, le=1000),
-            skip: int = Query(0, ge=0),
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> List[Dict[str, Any]]:
             """List chats with optional filtering."""
             try:
                 query = {}
-                if session_id:
-                    query["session_id"] = session_id
                 return self.mongodb.find_documents(
                     "chats",
                     query,
                     user_id=user_id,
-                    limit=limit,
-                    skip=skip,
                     sort=[("created_at", -1)]
                 )
             except Exception as e:
@@ -335,7 +327,7 @@ class DataServerAPI:
         @self.app.post("/sessions/", response_model=Session, status_code=status.HTTP_201_CREATED)
         async def create_session(
             session: SessionCreate,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Create a new session."""
             try:
@@ -349,7 +341,7 @@ class DataServerAPI:
         @self.app.get("/sessions/{session_id}", response_model=Session)
         async def get_session(
             session_id: str,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Get a session by ID."""
             try:
@@ -364,7 +356,7 @@ class DataServerAPI:
         async def update_session(
             session_id: str,
             session: SessionUpdate,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Update a session."""
             try:
@@ -383,7 +375,7 @@ class DataServerAPI:
         @self.app.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
         async def delete_session(
             session_id: str,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> None:
             """Delete a session."""
             try:
@@ -395,23 +387,15 @@ class DataServerAPI:
                 
         @self.app.get("/sessions/", response_model=List[Session])
         async def list_sessions(
-            user_id: Optional[str] = None,
-            chat_id: Optional[str] = None,
-            limit: int = Query(100, ge=1, le=1000),
-            skip: int = Query(0, ge=0),
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> List[Dict[str, Any]]:
             """List sessions with optional filtering."""
             try:
                 query = {}
-                if chat_id:
-                    query["chat_id"] = chat_id
                 return self.mongodb.find_documents(
                     "sessions",
                     query,
                     user_id=user_id,
-                    limit=limit,
-                    skip=skip,
                     sort=[("timestamp", -1)]
                 )
             except Exception as e:
@@ -421,7 +405,7 @@ class DataServerAPI:
         @self.app.post("/messages/", response_model=Message, status_code=status.HTTP_201_CREATED)
         async def create_message(
             message: MessageCreate,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Create a new message."""
             try:
@@ -436,7 +420,7 @@ class DataServerAPI:
         async def update_message(
             message_id: str,
             message: MessageUpdate,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Update a message."""
             try:
@@ -455,7 +439,7 @@ class DataServerAPI:
         @self.app.delete("/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
         async def delete_message(
             message_id: str,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> None:
             """Delete a message."""
             try:
@@ -467,29 +451,15 @@ class DataServerAPI:
                 
         @self.app.get("/messages/", response_model=List[Message])
         async def list_messages(
-            user_id: Optional[str] = None,
-            chat_id: Optional[str] = None,
-            session_id: Optional[str] = None,
-            sender_id: Optional[str] = None,
-            limit: int = Query(100, ge=1, le=1000),
-            skip: int = Query(0, ge=0),
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> List[Dict[str, Any]]:
             """List messages with optional filtering."""
             try:
                 query = {}
-                if chat_id:
-                    query["chat_id"] = chat_id
-                if session_id:
-                    query["session_id"] = session_id
-                if sender_id:
-                    query["sender_id"] = sender_id
                 return self.mongodb.find_documents(
                     "messages",
                     query,
                     user_id=user_id,
-                    limit=limit,
-                    skip=skip,
                     sort=[("timestamp", -1)]
                 )
             except Exception as e:
@@ -499,7 +469,7 @@ class DataServerAPI:
         @self.app.post("/workflows/", response_model=Workflow, status_code=status.HTTP_201_CREATED)
         async def create_workflow(
             workflow: WorkflowCreate,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Create a new workflow."""
             try:
@@ -513,7 +483,7 @@ class DataServerAPI:
         async def update_workflow(
             workflow_id: str,
             workflow: WorkflowUpdate,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Update a workflow."""
             try:
@@ -532,7 +502,7 @@ class DataServerAPI:
         @self.app.delete("/workflows/{workflow_id}", status_code=status.HTTP_204_NO_CONTENT)
         async def delete_workflow(
             workflow_id: str,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> None:
             """Delete a workflow."""
             try:
@@ -548,7 +518,7 @@ class DataServerAPI:
             status: Optional[str] = None,
             limit: int = Query(100, ge=1, le=1000),
             skip: int = Query(0, ge=0),
-            api_key: str = Depends(get_api_key)
+            user_id_dep: str = Depends(verify_api_key)
         ) -> List[Dict[str, Any]]:
             """List workflows with optional filtering."""
             try:
@@ -570,7 +540,7 @@ class DataServerAPI:
         @self.app.post("/agents/", response_model=Agent, status_code=status.HTTP_201_CREATED)
         async def create_agent(
             agent: AgentCreate,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Create a new agent."""
             try:
@@ -584,7 +554,7 @@ class DataServerAPI:
         async def update_agent(
             agent_id: str,
             agent: AgentUpdate,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Update an agent."""
             try:
@@ -603,7 +573,7 @@ class DataServerAPI:
         @self.app.delete("/agents/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
         async def delete_agent(
             agent_id: str,
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> None:
             """Delete an agent."""
             try:
@@ -615,26 +585,15 @@ class DataServerAPI:
                 
         @self.app.get("/agents/", response_model=List[Agent])
         async def list_agents(
-            user_id: Optional[str] = None,
-            type: Optional[str] = None,
-            status: Optional[str] = None,
-            limit: int = Query(100, ge=1, le=1000),
-            skip: int = Query(0, ge=0),
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> List[Dict[str, Any]]:
             """List agents with optional filtering."""
             try:
                 query = {}
-                if type:
-                    query["type"] = type
-                if status:
-                    query["status"] = status
                 return self.mongodb.find_documents(
                     "agents",
                     query,
                     user_id=user_id,
-                    limit=limit,
-                    skip=skip,
                     sort=[("last_active", -1)]
                 )
             except Exception as e:
@@ -654,7 +613,7 @@ class DataServerAPI:
             description: Optional[str] = None,
             capabilities: Optional[List[str]] = None,
             metadata: Optional[Dict[str, Any]] = None,
-            api_key: str = Depends(get_api_key)
+            user_id_dep: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Register a new agent or update an existing one."""
             try:
@@ -693,7 +652,7 @@ class DataServerAPI:
             user_id: str,
             name: str,
             agent_type: str,
-            api_key: str = Depends(get_api_key)
+            user_id_dep: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Get agent registration details."""
             try:
@@ -710,7 +669,7 @@ class DataServerAPI:
             user_id: str,
             agent_type: Optional[str] = None,
             status: Optional[str] = None,
-            api_key: str = Depends(get_api_key)
+            user_id_dep: str = Depends(verify_api_key)
         ) -> List[Dict[str, Any]]:
             """List registered agents for a user."""
             try:
@@ -726,7 +685,7 @@ class DataServerAPI:
         # Cleanup endpoint
         @self.app.post("/cleanup/")
         async def cleanup_old_data(
-            api_key: str = Depends(get_api_key)
+            user_id: str = Depends(verify_api_key)
         ) -> Dict[str, Any]:
             """Clean up old data."""
             try:
@@ -743,7 +702,7 @@ class DataServerAPI:
         @self.app.post("/teams", response_model=Team)
         async def create_team(
             team: TeamCreate,
-            user_id: str = Depends(get_api_key),
+            user_id: str = Depends(verify_api_key),
             db: MongoDBClient = Depends()
         ) -> Team:
             """Create a new team."""
@@ -767,7 +726,7 @@ class DataServerAPI:
 
         @self.app.get("/teams", response_model=List[Team])
         async def list_teams(
-            user_id: str = Depends(get_api_key),
+            user_id: str = Depends(verify_api_key),
             db: MongoDBClient = Depends()
         ) -> List[Team]:
             """List teams that the user is a member of."""
@@ -784,7 +743,7 @@ class DataServerAPI:
         @self.app.get("/teams/{team_id}", response_model=Team)
         async def get_team(
             team_id: str,
-            user_id: str = Depends(get_api_key),
+            user_id: str = Depends(verify_api_key),
             db: MongoDBClient = Depends()
         ) -> Team:
             """Get team details."""
@@ -807,7 +766,7 @@ class DataServerAPI:
         async def update_team(
             team_id: str,
             team_update: TeamUpdate,
-            user_id: str = Depends(get_api_key),
+            user_id: str = Depends(verify_api_key),
             db: MongoDBClient = Depends()
         ) -> Team:
             """Update team details."""
@@ -843,7 +802,7 @@ class DataServerAPI:
         @self.app.delete("/teams/{team_id}")
         async def delete_team(
             team_id: str,
-            user_id: str = Depends(get_api_key),
+            user_id: str = Depends(verify_api_key),
             db: MongoDBClient = Depends()
         ) -> dict:
             """Delete a team."""
@@ -871,7 +830,7 @@ class DataServerAPI:
         async def add_team_member(
             team_id: str,
             member_id: str,
-            user_id: str = Depends(get_api_key),
+            user_id: str = Depends(verify_api_key),
             db: MongoDBClient = Depends()
         ) -> dict:
             """Add a user to a team."""
@@ -903,7 +862,7 @@ class DataServerAPI:
         async def remove_team_member(
             team_id: str,
             member_id: str,
-            user_id: str = Depends(get_api_key),
+            user_id: str = Depends(verify_api_key),
             db: MongoDBClient = Depends()
         ) -> dict:
             """Remove a user from a team."""

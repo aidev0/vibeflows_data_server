@@ -8,7 +8,6 @@ from typing import Dict, List, Optional, Any, Union
 from bson import ObjectId
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from pymongo.errors import PyMongoError, DuplicateKeyError, ConnectionFailure, OperationFailure
-from data_server.config import VALID_AGENT_TYPES, AGENT_CONFIGS
 
 class MongoDBClient:
     """MongoDB client for data server."""
@@ -52,11 +51,7 @@ class MongoDBClient:
         self.collections = {
             "users": self.db.users,
             "chats": self.db.chats,
-            "sessions": self.db.sessions,
-            "messages": self.db.messages,
-            "workflows": self.db.workflows,
-            "agents": self.db.agents,
-            "teams": self.db.teams
+            "messages": self.db.messages
         }
         
     def _create_indexes(self) -> None:
@@ -69,67 +64,13 @@ class MongoDBClient:
             
             # Chats collection indexes
             self.collections["chats"].create_index([("user_id", ASCENDING)])
-            self.collections["chats"].create_index([("session_id", ASCENDING)])
             self.collections["chats"].create_index([("created_at", DESCENDING)])
-            
-            # Sessions collection indexes
-            self.collections["sessions"].create_index([("user_id", ASCENDING)])
-            self.collections["sessions"].create_index([("chat_id", ASCENDING)])
-            self.collections["sessions"].create_index([("timestamp", DESCENDING)])
-            self.collections["sessions"].create_index([("created_at", DESCENDING)])
             
             # Messages collection indexes
             self.collections["messages"].create_index([("chat_id", ASCENDING)])
-            self.collections["messages"].create_index([("session_id", ASCENDING)])
             self.collections["messages"].create_index([("sender_id", ASCENDING)])
             self.collections["messages"].create_index([("timestamp", DESCENDING)])
             self.collections["messages"].create_index([("created_at", DESCENDING)])
-            
-            # Workflows collection indexes
-            self.collections["workflows"].create_index([("user_id", ASCENDING)])
-            self.collections["workflows"].create_index([("chat_id", ASCENDING)])
-            self.collections["workflows"].create_index([("timestamp", DESCENDING)])
-            self.collections["workflows"].create_index([("version", ASCENDING)])
-            self.collections["workflows"].create_index([("status", ASCENDING)])
-            self.collections["workflows"].create_index([("created_at", DESCENDING)])
-            # Compound index for user_id and version
-            self.collections["workflows"].create_index([
-                ("user_id", ASCENDING),
-                ("version", ASCENDING)
-            ])
-            # Compound index for chat_id and version
-            self.collections["workflows"].create_index([
-                ("chat_id", ASCENDING),
-                ("version", ASCENDING)
-            ])
-            
-            # Agents collection indexes
-            self.collections["agents"].create_index([("user_id", ASCENDING)])
-            self.collections["agents"].create_index([("name", ASCENDING)])
-            self.collections["agents"].create_index([("type", ASCENDING)])
-            self.collections["agents"].create_index([("version", ASCENDING)])
-            self.collections["agents"].create_index([("status", ASCENDING)])
-            self.collections["agents"].create_index([("last_active", DESCENDING)])
-            self.collections["agents"].create_index([("created_at", DESCENDING)])
-            # Compound index for user_id and type
-            self.collections["agents"].create_index([
-                ("user_id", ASCENDING),
-                ("type", ASCENDING)
-            ])
-            # Compound index for user_id and version
-            self.collections["agents"].create_index([
-                ("user_id", ASCENDING),
-                ("version", ASCENDING)
-            ])
-            # Compound index for type and status
-            self.collections["agents"].create_index([
-                ("type", ASCENDING),
-                ("status", ASCENDING)
-            ])
-            
-            # Teams collection indexes
-            self.collections["teams"].create_index("owner_id")
-            self.collections["teams"].create_index("users")
             
             self.logger.info("Created indexes for all collections")
         except PyMongoError as e:
@@ -293,184 +234,6 @@ class MongoDBClient:
             self.client.close()
             self.logger.info("Closed MongoDB connection")
             
-    def register_agent(
-        self,
-        user_id: str,
-        name: str,
-        agent_type: str,
-        version: str,
-        config: Dict[str, Any],
-        system_message: str,
-        src: str,
-        command: str,
-        description: Optional[str] = None,
-        capabilities: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> str:
-        """Register a new agent or update an existing one.
-        
-        This function handles both new agent registration and updates to existing agents.
-        If an agent with the same name and type exists for the user, it will be updated
-        with the new version and configuration.
-        
-        Args:
-            user_id: User ID who owns the agent
-            name: Agent name
-            agent_type: Type of agent (e.g., "workflow_creator", "problem_understanding", "gemini")
-            version: Agent version (must follow semantic versioning)
-            config: Agent configuration
-            system_message: System message for the agent
-            src: Source code or implementation
-            command: Command to run the agent
-            description: Optional agent description
-            capabilities: Optional list of agent capabilities
-            metadata: Optional metadata about the agent
-            
-        Returns:
-            Agent ID
-            
-        Raises:
-            ValueError: If agent type is invalid or version format is incorrect
-            PyMongoError: If database operation fails
-        """
-        try:
-            # Validate agent type
-            if agent_type not in VALID_AGENT_TYPES:
-                raise ValueError(f"Invalid agent type. Must be one of: {', '.join(VALID_AGENT_TYPES)}")
-            
-            # Validate version format (semantic versioning)
-            import re
-            if not re.match(r'^\d+\.\d+\.\d+$', version):
-                raise ValueError("Version must be in semantic versioning format (e.g., 1.0.0)")
-            
-            # Merge default config with provided config based on agent type
-            default_config = AGENT_CONFIGS.get(agent_type, AGENT_CONFIGS["default"])
-            merged_config = {**default_config, **config}
-            
-            # Prepare agent document
-            agent_doc = {
-                "user_id": user_id,
-                "name": name,
-                "type": agent_type,
-                "version": version,
-                "config": merged_config,
-                "system_message": system_message,
-                "src": src,
-                "command": command,
-                "description": description,
-                "capabilities": capabilities or [],
-                "metadata": metadata or {},
-                "status": "active",
-                "last_active": datetime.utcnow(),
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
-            }
-            
-            # Check if agent already exists
-            existing_agent = self.collections["agents"].find_one({
-                "user_id": user_id,
-                "name": name,
-                "type": agent_type
-            })
-            
-            if existing_agent:
-                # Update existing agent
-                self.logger.info(f"Updating existing agent: {name} ({agent_type})")
-                result = self.collections["agents"].update_one(
-                    {"_id": existing_agent["_id"]},
-                    {
-                        "$set": {
-                            "version": version,
-                            "config": merged_config,
-                            "system_message": system_message,
-                            "src": src,
-                            "command": command,
-                            "description": description,
-                            "capabilities": capabilities or existing_agent.get("capabilities", []),
-                            "metadata": metadata or existing_agent.get("metadata", {}),
-                            "last_active": datetime.utcnow(),
-                            "updated_at": datetime.utcnow()
-                        }
-                    }
-                )
-                if result.modified_count > 0:
-                    return str(existing_agent["_id"])
-                else:
-                    raise PyMongoError("Failed to update existing agent")
-            else:
-                # Insert new agent
-                self.logger.info(f"Registering new agent: {name} ({agent_type})")
-                result = self.collections["agents"].insert_one(agent_doc)
-                return str(result.inserted_id)
-                
-        except DuplicateKeyError as e:
-            self.logger.error(f"Duplicate agent registration: {str(e)}")
-            raise ValueError("An agent with this name and type already exists for this user")
-        except PyMongoError as e:
-            self.logger.error(f"Failed to register agent: {str(e)}")
-            raise
-        except Exception as e:
-            self.logger.error(f"Unexpected error during agent registration: {str(e)}")
-            raise
-            
-    def get_agent_registration(
-        self,
-        user_id: str,
-        name: str,
-        agent_type: str
-    ) -> Optional[Dict[str, Any]]:
-        """Get agent registration details.
-        
-        Args:
-            user_id: User ID who owns the agent
-            name: Agent name
-            agent_type: Type of agent
-            
-        Returns:
-            Agent document if found, None otherwise
-        """
-        try:
-            agent = self.collections["agents"].find_one({
-                "user_id": user_id,
-                "name": name,
-                "type": agent_type
-            })
-            return self._convert_id(agent) if agent else None
-        except PyMongoError as e:
-            self.logger.error(f"Failed to get agent registration: {str(e)}")
-            raise
-            
-    def list_registered_agents(
-        self,
-        user_id: str,
-        agent_type: Optional[str] = None,
-        status: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """List registered agents for a user.
-        
-        Args:
-            user_id: User ID
-            agent_type: Optional filter by agent type
-            status: Optional filter by agent status
-            
-        Returns:
-            List of agent documents
-        """
-        try:
-            query = {"user_id": user_id}
-            if agent_type:
-                query["type"] = agent_type
-            if status:
-                query["status"] = status
-                
-            return self._convert_ids(list(self.collections["agents"].find(
-                query,
-                sort=[("last_active", -1)]
-            )))
-        except PyMongoError as e:
-            self.logger.error(f"Failed to list registered agents: {str(e)}")
-            raise
-
     def _get_user_teams(self, user_id: str) -> List[str]:
         """Get list of team IDs that the user belongs to.
         
