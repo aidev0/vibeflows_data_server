@@ -5,7 +5,7 @@ Configuration settings for the data server.
 import os
 from typing import Dict, Any
 from dotenv import load_dotenv
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from typing import Optional
 
 # Load environment variables from .env file
