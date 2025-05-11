@@ -140,10 +140,20 @@ class DataServerAPI:
                 raise HTTPException(status_code=404, detail="User not found")
             return user
 
-        @self.router.get("/users", response_model=List[User], dependencies=[Depends(verify_api_key)])
-        async def get_users(user_id: str):
-            users = await self.mongodb.get_users()
-            return await get_user_data(user_id, users)
+        @self.app.get("/users/", response_model=List[User])
+        async def get_users(
+            user_id: str = Depends(verify_api_key)
+        ) -> List[Dict[str, Any]]:
+            """Get users. If user_id is admin_id, return all users; otherwise, return only the user's own info."""
+            try:
+                if user_id == os.environ.get("ADMIN_ID"):
+                    # Admin can see all users
+                    return self.mongodb.find_documents("users", {})
+                else:
+                    # Non-admin users only see their own info
+                    return self.mongodb.find_documents("users", {"user_id": user_id})
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
 
         # Team routes
         @self.router.get("/teams/{team_id}", response_model=Team, dependencies=[Depends(verify_api_key)])
